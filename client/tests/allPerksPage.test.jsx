@@ -1,14 +1,11 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { Routes, Route } from 'react-router-dom';
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { Routes, Route } from "react-router-dom";
 
-import AllPerks from '../src/pages/AllPerks.jsx';
-import { renderWithRouter } from './utils/renderWithRouter.js';
+import AllPerks from "../src/pages/AllPerks.jsx";
+import { renderWithRouter } from "./utils/renderWithRouter.js";
 
-
-  
-
-describe('AllPerks page (Directory)', () => {
-  test('lists public perks and responds to name filtering', async () => {
+describe("AllPerks page (Directory)", () => {
+  test("lists public perks and responds to name filtering", async () => {
     // The seeded record gives us a deterministic expectation regardless of the
     // rest of the shared database contents.
     const seededPerk = global.__TEST_CONTEXT__.seededPerk;
@@ -18,26 +15,41 @@ describe('AllPerks page (Directory)', () => {
       <Routes>
         <Route path="/explore" element={<AllPerks />} />
       </Routes>,
-      { initialEntries: ['/explore'] }
+      { initialEntries: ["/explore"] }
     );
 
     // Wait for the baseline card to appear which guarantees the asynchronous
     // fetch finished.
-    await waitFor(() => {
-      expect(screen.getByText(seededPerk.title)).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        // Perks are rendered as <Link> cards. Wait for at least one link card to
+        // appear and verify one of them contains the seeded perk title in its
+        // combined textContent (handles split nodes).
+        const cards = screen.getAllByRole("link");
+        expect(
+          cards.some((c) => c.textContent.includes(seededPerk.title))
+        ).toBe(true);
+      },
+      { timeout: 10000 }
+    );
 
     // Interact with the name filter input using the real value that
     // corresponds to the seeded record.
-    const nameFilter = screen.getByPlaceholderText('Enter perk name...');
+    const nameFilter = screen.getByPlaceholderText("Enter perk name...");
     fireEvent.change(nameFilter, { target: { value: seededPerk.title } });
 
-    await waitFor(() => {
-      expect(screen.getByText(seededPerk.title)).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        const cards = screen.getAllByRole("link");
+        expect(
+          cards.some((c) => c.textContent.includes(seededPerk.title))
+        ).toBe(true);
+      },
+      { timeout: 10000 }
+    );
 
     // The summary text should continue to reflect the number of matching perks.
-    expect(screen.getByText(/showing/i)).toHaveTextContent('Showing');
+    expect(screen.getByText(/showing/i)).toHaveTextContent("Showing");
   });
 
   /*
@@ -50,8 +62,48 @@ describe('AllPerks page (Directory)', () => {
   - verify the summary text reflects the number of matching perks
   */
 
-  test('lists public perks and responds to merchant filtering', async () => {
-    // This will always fail until the TODO above is implemented.
-    expect(true).toBe(false);
+  test("lists public perks and responds to merchant filtering", async () => {
+    const seededPerk = global.__TEST_CONTEXT__.seededPerk;
+
+    renderWithRouter(
+      <Routes>
+        <Route path="/explore" element={<AllPerks />} />
+      </Routes>,
+      { initialEntries: ["/explore"] }
+    );
+
+    // wait for initial fetch to complete and seeded card to appear
+    await waitFor(
+      () => {
+        const cards = screen.getAllByRole("link");
+        expect(
+          cards.some((c) => c.textContent.includes(seededPerk.title))
+        ).toBe(true);
+      },
+      { timeout: 10000 }
+    );
+
+    // 🏆 FIX: Find the merchant dropdown (role='combobox') by its accessible name.
+    // The label text "Filter by Merchant" serves as its name.
+    const merchantSelect = screen.getByRole("combobox");
+
+    // change to the seeded perk's merchant
+    fireEvent.change(merchantSelect, {
+      target: { value: seededPerk.merchant },
+    });
+
+    // wait for UI to reflect the filtered results
+    await waitFor(
+      () => {
+        const cards = screen.getAllByRole("link");
+        expect(
+          cards.some((c) => c.textContent.includes(seededPerk.title))
+        ).toBe(true);
+      },
+      { timeout: 10000 }
+    );
+
+    // summary should still indicate the count label
+    expect(screen.getByText(/showing/i)).toHaveTextContent("Showing");
   });
 });
